@@ -1,0 +1,20 @@
+# Negative sentiment patterns
+# One pattern per line
+# Lines starting with # are comments and will be ignored
+
+hate
+not happy
+terrible
+awful
+worst
+bad
+disappointed
+frustrating
+useless
+waste
+poor
+disappointing
+sucks
+horrible
+dislike
+cancel

@@ -1,0 +1,39 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+
+# Models directory (large files)
+.models/
+models/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+
+# Test and analysis outputs
+sentiment-analysis-test-file/
+*.log
+
+# Output files
+data/*.json
+data/*.txt
+
+# Keep data directory structure
+!data/.gitkeep
+!models/.gitkeep

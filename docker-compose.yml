@@ -1,0 +1,41 @@
+services:
+  # API Service (default)
+  sentiment-analysis-api:
+    build: .
+    image: sentiment-analysis-tool:latest
+    container_name: sentiment-analysis-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount models directory for persistence (models are ~7GB+)
+      - ./models:/app/.models
+      # Mount input/output directory for file processing
+      - ./data:/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # CLI Service (for command-line usage)
+  sentiment-analysis-cli:
+    build: .
+    image: sentiment-analysis-tool:latest
+    container_name: sentiment-analysis-cli
+    volumes:
+      - ./models:/app/.models
+      - ./data:/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    entrypoint: ["python", "sentiment_analysis_tool.py"]
+    command: ["--help"]
+    stdin_open: true
+    tty: true
+    profiles:
+      - cli

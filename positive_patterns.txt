@@ -1,0 +1,20 @@
+# Positive sentiment patterns
+# One pattern per line
+# Lines starting with # are comments and will be ignored
+
+love
+great
+excellent
+awesome
+good
+best
+helpful
+amazing
+fantastic
+wonderful
+like
+recommend
+satisfied
+happy
+perfect
+enjoy
