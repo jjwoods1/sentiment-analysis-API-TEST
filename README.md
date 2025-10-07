@@ -7,6 +7,7 @@ Advanced sentiment analysis tool using DistilBERT, RoBERTa, and Llama 2 models f
 - **REST API**: FastAPI-based REST API for easy integration
 - **Overall Sentiment Analysis**: Analyze general sentiment of text using DistilBERT or RoBERTa models
 - **Contextual Sentiment Analysis**: Analyze sentiment about specific contexts using Llama 2 7B with rule-based detection
+- **Pattern Management**: Configurable sentiment patterns via text files or REST API endpoints
 - **Docker Support**: Easy deployment with Docker and docker-compose
 - **Multiple Input Formats**: Supports JSON requests, file uploads, plain text and JSON transcript files
 - **Interactive Documentation**: Auto-generated API docs at `/docs`
@@ -56,13 +57,26 @@ docker-compose down
 
 Once running, access the API at `http://localhost:8000`:
 
+#### Health & Documentation
 - **GET `/`** - Health check
 - **GET `/health`** - Detailed health status
 - **GET `/docs`** - Interactive API documentation (Swagger UI)
+
+#### Sentiment Analysis
 - **POST `/analyze/overall`** - Analyze overall sentiment (JSON)
 - **POST `/analyze/contextual`** - Analyze contextual sentiment (JSON)
 - **POST `/analyze/overall/file`** - Analyze overall sentiment (file upload)
 - **POST `/analyze/contextual/file`** - Analyze contextual sentiment (file upload)
+
+#### Pattern Management
+- **GET `/patterns/positive`** - Get list of positive sentiment patterns
+- **GET `/patterns/negative`** - Get list of negative sentiment patterns
+- **POST `/patterns/positive`** - Add a new positive sentiment pattern
+- **POST `/patterns/negative`** - Add a new negative sentiment pattern
+- **DELETE `/patterns/positive/{pattern}`** - Delete a specific positive pattern
+- **DELETE `/patterns/negative/{pattern}`** - Delete a specific negative pattern
+- **PUT `/patterns/positive`** - Replace all positive patterns
+- **PUT `/patterns/negative`** - Replace all negative patterns
 
 ### Example API Requests
 
@@ -108,6 +122,30 @@ curl -X POST "http://localhost:8000/analyze/overall/file" \
 curl -X POST "http://localhost:8000/analyze/contextual/file" \
   -F "file=@./data/transcription-example.json" \
   -F "context=IONOS"
+```
+
+**Get Positive Patterns:**
+```bash
+curl -X GET "http://localhost:8000/patterns/positive"
+```
+
+**Add a Positive Pattern:**
+```bash
+curl -X POST "http://localhost:8000/patterns/positive" \
+  -H "Content-Type: application/json" \
+  -d '{"pattern": "brilliant"}'
+```
+
+**Delete a Pattern:**
+```bash
+curl -X DELETE "http://localhost:8000/patterns/positive/brilliant"
+```
+
+**Replace All Negative Patterns:**
+```bash
+curl -X PUT "http://localhost:8000/patterns/negative" \
+  -H "Content-Type: application/json" \
+  -d '{"patterns": ["terrible", "awful", "horrible", "hate"]}'
 ```
 
 ### Using the Interactive Docs
@@ -231,6 +269,34 @@ Requires JSON transcript files matching the schema in `transcript-schema.json`:
 - **Llama 2 7B**: Quantized GGUF model (auto-downloaded on first use)
 
 The Llama 2 model (~4GB) is downloaded automatically to `.models/llm/` on first run of contextual analysis.
+
+## Pattern Management
+
+The tool uses configurable sentiment patterns for rule-based detection before LLM analysis. You can manage patterns in two ways:
+
+### 1. Edit Pattern Files Directly
+
+Edit `negative_patterns.txt` or `positive_patterns.txt`:
+```txt
+# Negative sentiment patterns
+# One pattern per line
+# Lines starting with # are comments
+
+hate
+terrible
+awful
+disappointed
+```
+
+### 2. Use the API
+
+Manage patterns programmatically via REST API:
+- View patterns: `GET /patterns/positive` or `GET /patterns/negative`
+- Add pattern: `POST /patterns/positive` with `{"pattern": "excellent"}`
+- Delete pattern: `DELETE /patterns/positive/excellent`
+- Replace all: `PUT /patterns/positive` with `{"patterns": ["great", "awesome"]}`
+
+Changes take effect immediately - no restart required!
 
 ## Docker Volumes
 
