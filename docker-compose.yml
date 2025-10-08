@@ -11,6 +11,9 @@ services:
       - ./models:/app/.models
       # Mount input/output directory for file processing
       - ./data:/data
+      # Mount pattern files for live updates without restart
+      - ./positive_patterns.txt:/app/positive_patterns.txt
+      - ./negative_patterns.txt:/app/negative_patterns.txt
     environment:
       - PYTHONUNBUFFERED=1
       - HOST=0.0.0.0
@@ -31,6 +34,9 @@ services:
     volumes:
       - ./models:/app/.models
       - ./data:/data
+      # Mount pattern files for live updates without restart
+      - ./positive_patterns.txt:/app/positive_patterns.txt
+      - ./negative_patterns.txt:/app/negative_patterns.txt
     environment:
       - PYTHONUNBUFFERED=1
     entrypoint: ["python", "sentiment_analysis_tool.py"]

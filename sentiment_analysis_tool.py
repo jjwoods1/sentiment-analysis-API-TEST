@@ -105,7 +105,7 @@ def load_patterns_from_file(file_path: Path) -> List[str]:
 
     return patterns
 
-def detect_sentiment_keywords(text: str, context: str) -> Optional[str]:
+def detect_sentiment_keywords(text: str, context: str) -> tuple[Optional[str], Optional[str]]:
     """
     Use rule-based detection for strong sentiment indicators.
 
@@ -114,7 +114,8 @@ def detect_sentiment_keywords(text: str, context: str) -> Optional[str]:
         context: The context word to focus on
 
     Returns:
-        "positive", "negative", or None if no strong indicators found
+        Tuple of (sentiment, matched_pattern) where sentiment is "positive", "negative", or None
+        and matched_pattern is the pattern that was matched, or None
     """
     text_lower = text.lower()
     context_lower = context.lower()
@@ -128,16 +129,16 @@ def detect_sentiment_keywords(text: str, context: str) -> Optional[str]:
         for pattern in negative_patterns:
             if pattern in text_lower:
                 logger.info(f"Rule-based detection found negative pattern '{pattern}' in text")
-                return "negative"
+                return "negative", pattern
 
         # Check for positive sentiment patterns
         for pattern in positive_patterns:
             if pattern in text_lower:
                 logger.info(f"Rule-based detection found positive pattern '{pattern}' in text")
-                return "positive"
+                return "positive", pattern
 
     # No strong sentiment found
-    return None
+    return None, None
 
 def validate_json_against_schema(json_data: Dict[str, Any], schema_file: str) -> bool:
     """Validate a JSON object against a schema."""
@@ -255,8 +256,14 @@ def analyze_overall_sentiment(file_path: str, model_name: str = "roberta") -> Di
         "positive": pos,
         "neutral": neutral,
         "negative": neg,
+        "metadata": {
+            "model_used": model_name,
+            "model_full_name": model,
+            "total_chunks_analyzed": len(chunks),
+            "device": "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
+        }
     }
-    
+
     logger.info(f"Overall sentiment analysis complete: {overall}")
     return output
 
@@ -321,13 +328,18 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
     
     for segment in tqdm(context_segments, desc="Analyzing segments", ncols=80):
         segment_text = segment.get("text", "")
-        
+
         # First check for strong sentiment indicators with rule-based approach
-        rule_sentiment = detect_sentiment_keywords(segment_text, context)
-        
+        rule_sentiment, matched_pattern = detect_sentiment_keywords(segment_text, context)
+
+        detection_method = None
+        detection_details = None
+
         if rule_sentiment:
             # Strong rule-based sentiment found, use it
             sentiment = rule_sentiment
+            detection_method = "rule-based"
+            detection_details = f"Matched pattern: '{matched_pattern}'"
             logger.info(f"Using rule-based sentiment for segment {segment.get('id')}: {sentiment}")
         else:
             # No strong indicators, use enhanced LLM prompt
@@ -359,15 +371,19 @@ Respond in this exact JSON format:
                 response = llm(prompt, max_tokens=MAX_RESPONSE_TOKENS)
             finally:
                 sys.stdout, sys.stderr = _stdout, _stderr
-            
+
             # Parse JSON response safely
             try:
                 res_json = json.loads(response['choices'][0]['text'].strip())
                 sentiment = res_json.get("sentiment", "neutral")
+                detection_method = "llm-based"
+                detection_details = f"Model: Llama 2 7B"
                 logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
             except Exception:
                 sentiment = "neutral"
-        
+                detection_method = "llm-based"
+                detection_details = "Failed to parse LLM response, defaulted to neutral"
+
         # Update counters
         if sentiment == "positive":
             pos += 1
@@ -375,14 +391,16 @@ Respond in this exact JSON format:
             neg += 1
         else:
             neutral += 1
-        
+
         # Add segment to results with start and end times
         result_segments.append({
             "segment-id": segment.get("id"),
             "start": segment.get("start"),
             "end": segment.get("end"),
             "text": segment_text,
-            "sentiment": sentiment
+            "sentiment": sentiment,
+            "detection_method": detection_method,
+            "detection_details": detection_details
         })
     
     # Determine overall sentiment
@@ -400,9 +418,18 @@ Respond in this exact JSON format:
         "positive": pos,
         "neutral": neutral,
         "negative": neg,
-        "segments": result_segments
+        "segments": result_segments,
+        "metadata": {
+            "total_segments_analyzed": len(result_segments),
+            "total_segments_in_transcript": len(segments),
+            "pattern_files_loaded": {
+                "positive_patterns": str(POSITIVE_PATTERNS_FILE),
+                "negative_patterns": str(NEGATIVE_PATTERNS_FILE)
+            },
+            "analysis_methods_used": list(set([seg["detection_method"] for seg in result_segments]))
+        }
     }
-    
+
     logger.info(f"Contextual sentiment analysis complete for '{context}': {overall}")
     return output
 
