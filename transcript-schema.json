@@ -30,5 +30,5 @@
     }
   },
   "required": ["text", "segments"],
-  "additionalProperties": false
+  "additionalProperties": true
 }
