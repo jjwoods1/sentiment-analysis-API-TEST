@@ -143,25 +143,34 @@ def detect_sentiment_keywords(text: str, context: str) -> tuple[Optional[str], O
 def validate_json_against_schema(json_data: Dict[str, Any], schema_file: str) -> bool:
     """Validate a JSON object against a schema."""
     try:
+        logger.info(f"Validating JSON with keys: {list(json_data.keys())}")
+        logger.info(f"JSON data type: {type(json_data)}")
+
         with open(schema_file, 'r', encoding='utf-8') as f:
             schema = json.load(f)
 
         # Basic validation (more comprehensive validation would use jsonschema library)
         required_keys = schema.get("required", [])
+        logger.info(f"Schema requires keys: {required_keys}")
+
         for key in required_keys:
             if key not in json_data:
                 logger.error(f"Missing required key: {key}")
+                logger.error(f"Available keys in json_data: {list(json_data.keys())}")
                 return False
 
         # Check segments structure for transcripts
         if "segments" in json_data:
+            logger.info(f"Validating {len(json_data['segments'])} segments")
             for i, segment in enumerate(json_data["segments"]):
                 required_segment_keys = ["id", "start", "end", "text"]
                 for seg_key in required_segment_keys:
                     if seg_key not in segment:
                         logger.error(f"Invalid segment {i}: missing required field '{seg_key}'")
+                        logger.error(f"Segment has keys: {list(segment.keys())}")
                         return False
 
+        logger.info("Validation passed")
         return True
     except Exception as e:
         logger.error(f"Schema validation error: {e}")
