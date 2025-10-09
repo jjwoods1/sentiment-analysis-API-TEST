@@ -168,18 +168,29 @@ async def analyze_overall(request: OverallSentimentRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze/contextual", response_model=ContextualSentimentResponse)
-async def analyze_contextual(request: ContextualSentimentRequest):
+async def analyze_contextual(request: ContextualSentimentRequest | List[ContextualSentimentRequest]):
     """
     Analyze contextual sentiment using Llama 2 model.
 
-    - **transcript**: Transcript data with segments
+    - **transcript**: Transcript data with segments (or array containing single transcript)
     - **context**: Context word to analyze sentiment for
     """
     try:
-        logger.info(f"Contextual sentiment analysis request for context: {request.context}")
+        # Handle array-wrapped format: [{ context, transcript }] -> { context, transcript }
+        if isinstance(request, list):
+            if len(request) == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Empty array in request"
+                )
+            actual_request = request[0]
+        else:
+            actual_request = request
+
+        logger.info(f"Contextual sentiment analysis request for context: {actual_request.context}")
 
         # Validate context
-        if not request.context or not request.context.strip():
+        if not actual_request.context or not actual_request.context.strip():
             raise HTTPException(
                 status_code=400,
                 detail="Context word is required"
@@ -188,7 +199,7 @@ async def analyze_contextual(request: ContextualSentimentRequest):
         # Convert Pydantic model to dict format expected by analysis function
         import json
         transcript_dict = {
-            "text": request.transcript.text,
+            "text": actual_request.transcript.text,
             "segments": [
                 {
                     "id": seg.id,
@@ -196,12 +207,12 @@ async def analyze_contextual(request: ContextualSentimentRequest):
                     "end": seg.end,
                     "text": seg.text
                 }
-                for seg in request.transcript.segments
+                for seg in actual_request.transcript.segments
             ]
         }
 
-        if request.transcript.metadata:
-            transcript_dict["metadata"] = request.transcript.metadata
+        if actual_request.transcript.metadata:
+            transcript_dict["metadata"] = actual_request.transcript.metadata
 
         # Validate against schema
         schema_path = os.path.join(BASE_DIR, "transcript-schema.json")
@@ -216,7 +227,7 @@ async def analyze_contextual(request: ContextualSentimentRequest):
         temp_file.write_text(json.dumps(transcript_dict), encoding='utf-8')
 
         # Run analysis
-        result = analyze_contextual_sentiment(str(temp_file), request.context)
+        result = analyze_contextual_sentiment(str(temp_file), actual_request.context)
 
         # Clean up
         temp_file.unlink()
@@ -295,7 +306,19 @@ async def analyze_contextual_file(
         content = await file.read()
         import json
         try:
-            transcript_dict = json.loads(content.decode('utf-8'))
+            data = json.loads(content.decode('utf-8'))
+
+            # Handle array-wrapped format: [{ transcript }] -> { transcript }
+            if isinstance(data, list):
+                if len(data) == 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Empty array in JSON file"
+                    )
+                transcript_dict = data[0]
+            else:
+                transcript_dict = data
+
         except json.JSONDecodeError:
             raise HTTPException(
                 status_code=400,
