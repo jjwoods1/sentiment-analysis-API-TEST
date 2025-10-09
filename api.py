@@ -319,18 +319,24 @@ async def analyze_contextual_file(
             else:
                 transcript_dict = data
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
             raise HTTPException(
                 status_code=400,
-                detail="Invalid JSON file"
+                detail=f"Invalid JSON file: {str(e)}"
             )
+
+        # Log the transcript structure for debugging
+        logger.info(f"Transcript has keys: {list(transcript_dict.keys())}")
+        logger.info(f"Transcript has {len(transcript_dict.get('segments', []))} segments")
 
         # Validate against schema
         schema_path = os.path.join(BASE_DIR, "transcript-schema.json")
         if not validate_json_against_schema(transcript_dict, schema_path):
+            logger.error(f"Schema validation failed for transcript with keys: {list(transcript_dict.keys())}")
             raise HTTPException(
                 status_code=400,
-                detail="Invalid transcript format"
+                detail="Invalid transcript format - check server logs for details"
             )
 
         # Create temporary file for analysis
