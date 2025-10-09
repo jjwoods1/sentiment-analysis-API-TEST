@@ -304,9 +304,17 @@ async def analyze_contextual_file(
 
         # Read and validate file content
         content = await file.read()
+        logger.info(f"Received file size: {len(content)} bytes")
+
         import json
         try:
             data = json.loads(content.decode('utf-8'))
+            logger.info(f"Parsed JSON type: {type(data)}")
+
+            if isinstance(data, list):
+                logger.info(f"Data is array with {len(data)} elements")
+            else:
+                logger.info(f"Data is object with keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
 
             # Handle array-wrapped format: [{ transcript }] -> { transcript }
             if isinstance(data, list):
@@ -316,8 +324,10 @@ async def analyze_contextual_file(
                         detail="Empty array in JSON file"
                     )
                 transcript_dict = data[0]
+                logger.info(f"Unwrapped array, transcript_dict keys: {list(transcript_dict.keys())}")
             else:
                 transcript_dict = data
+                logger.info(f"Using data directly, keys: {list(transcript_dict.keys())}")
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
@@ -327,8 +337,11 @@ async def analyze_contextual_file(
             )
 
         # Log the transcript structure for debugging
-        logger.info(f"Transcript has keys: {list(transcript_dict.keys())}")
-        logger.info(f"Transcript has {len(transcript_dict.get('segments', []))} segments")
+        logger.info(f"Final transcript_dict keys: {list(transcript_dict.keys())}")
+        logger.info(f"Has 'text' key: {'text' in transcript_dict}")
+        logger.info(f"Has 'segments' key: {'segments' in transcript_dict}")
+        if 'segments' in transcript_dict:
+            logger.info(f"Transcript has {len(transcript_dict.get('segments', []))} segments")
 
         # Validate against schema
         schema_path = os.path.join(BASE_DIR, "transcript-schema.json")
