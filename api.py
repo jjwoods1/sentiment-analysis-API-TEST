@@ -293,7 +293,9 @@ async def analyze_contextual_file(
     - **context**: Context word to analyze sentiment for
     """
     try:
+        logger.info(f"========== NEW REQUEST ==========")
         logger.info(f"Contextual sentiment analysis from file: {file.filename}")
+        logger.info(f"Context: {context}")
 
         # Validate context
         if not context or not context.strip():
