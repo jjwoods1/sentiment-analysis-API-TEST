@@ -14,6 +14,7 @@ import sys
 import subprocess
 import json
 import argparse
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Union, Optional
 import logging
@@ -120,7 +121,9 @@ def detect_sentiment_keywords(text: str, context: str) -> tuple[Optional[str], O
     text_lower = text.lower()
     context_lower = context.lower()
 
-    if context_lower in text_lower:
+    # Check for whole-word match using regex word boundary
+    context_pattern = re.compile(r'\b' + re.escape(context_lower) + r'\b', re.IGNORECASE)
+    if context_pattern.search(text):
         # Load patterns from files
         negative_patterns = load_patterns_from_file(NEGATIVE_PATTERNS_FILE)
         positive_patterns = load_patterns_from_file(POSITIVE_PATTERNS_FILE)
@@ -296,10 +299,14 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
         logger.error("No segments found in the transcript")
         sys.exit(1)
     
-    # Find segments containing the context word
+    # Find segments containing the context word (whole word match only)
     context_segments = []
+    # Use regex word boundary to match whole words only
+    context_pattern = re.compile(r'\b' + re.escape(context.lower()) + r'\b', re.IGNORECASE)
+
     for segment in segments:
-        if context.lower() in segment.get("text", "").lower():
+        segment_text = segment.get("text", "")
+        if context_pattern.search(segment_text):
             context_segments.append(segment)
     
     if not context_segments:
