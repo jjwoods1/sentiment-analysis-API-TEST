@@ -145,21 +145,23 @@ def validate_json_against_schema(json_data: Dict[str, Any], schema_file: str) ->
     try:
         with open(schema_file, 'r', encoding='utf-8') as f:
             schema = json.load(f)
-        
+
         # Basic validation (more comprehensive validation would use jsonschema library)
         required_keys = schema.get("required", [])
         for key in required_keys:
             if key not in json_data:
                 logger.error(f"Missing required key: {key}")
                 return False
-                
+
         # Check segments structure for transcripts
         if "segments" in json_data:
-            for segment in json_data["segments"]:
-                if "id" not in segment or "text" not in segment:
-                    logger.error("Invalid segment structure: missing id or text")
-                    return False
-        
+            for i, segment in enumerate(json_data["segments"]):
+                required_segment_keys = ["id", "start", "end", "text"]
+                for seg_key in required_segment_keys:
+                    if seg_key not in segment:
+                        logger.error(f"Invalid segment {i}: missing required field '{seg_key}'")
+                        return False
+
         return True
     except Exception as e:
         logger.error(f"Schema validation error: {e}")
