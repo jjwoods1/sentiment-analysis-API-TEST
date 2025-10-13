@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
@@ -22,6 +23,8 @@ COPY sentiment_analysis_tool.py .
 COPY api.py .
 COPY transcript-schema.json .
 COPY transcription-example.json .
+COPY positive_patterns.txt .
+COPY negative_patterns.txt .
 
 # Create directory for models (will be mounted as volume)
 RUN mkdir -p /app/.models/llm

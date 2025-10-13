@@ -392,15 +392,52 @@ Respond in this exact JSON format:
 
             # Parse JSON response safely
             try:
-                res_json = json.loads(response['choices'][0]['text'].strip())
-                sentiment = res_json.get("sentiment", "neutral")
-                detection_method = "llm-based"
-                detection_details = f"Model: Llama 2 7B"
-                logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
-            except Exception:
+                llm_response_text = response['choices'][0]['text'].strip()
+                logger.info(f"Raw LLM response: {llm_response_text}")
+
+                # Try to extract JSON from the response (LLM might include extra text)
+                # Look for JSON pattern in the response
+                json_match = re.search(r'\{[^}]*"sentiment"\s*:\s*"(positive|negative|neutral)"[^}]*\}', llm_response_text, re.IGNORECASE)
+
+                if json_match:
+                    # Parse the matched JSON
+                    res_json = json.loads(json_match.group(0))
+                    sentiment = res_json.get("sentiment", "neutral").lower()
+
+                    # Validate sentiment value
+                    if sentiment not in ["positive", "negative", "neutral"]:
+                        logger.warning(f"Invalid sentiment value '{sentiment}' from LLM, defaulting to neutral")
+                        sentiment = "neutral"
+
+                    detection_method = "llm-based"
+                    detection_details = f"Model: Llama 2 7B"
+                    logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
+                else:
+                    # Try parsing the entire response as JSON
+                    res_json = json.loads(llm_response_text)
+                    sentiment = res_json.get("sentiment", "neutral").lower()
+
+                    # Validate sentiment value
+                    if sentiment not in ["positive", "negative", "neutral"]:
+                        logger.warning(f"Invalid sentiment value '{sentiment}' from LLM, defaulting to neutral")
+                        sentiment = "neutral"
+
+                    detection_method = "llm-based"
+                    detection_details = f"Model: Llama 2 7B"
+                    logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
+
+            except json.JSONDecodeError as e:
+                logger.error(f"LLM failed to parse - JSON decode error: {e}")
+                logger.error(f"LLM response was: {llm_response_text}")
                 sentiment = "neutral"
                 detection_method = "llm-based"
-                detection_details = "Failed to parse LLM response, defaulted to neutral"
+                detection_details = f"Failed to parse LLM response (JSON error), defaulted to neutral"
+            except Exception as e:
+                logger.error(f"LLM failed to parse - unexpected error: {e}")
+                logger.error(f"LLM response was: {response['choices'][0]['text'].strip() if 'choices' in response and len(response['choices']) > 0 else 'No response'}")
+                sentiment = "neutral"
+                detection_method = "llm-based"
+                detection_details = f"Failed to parse LLM response (error: {str(e)}), defaulted to neutral"
 
         # Update counters
         if sentiment == "positive":
