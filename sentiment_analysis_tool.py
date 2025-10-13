@@ -362,24 +362,30 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
         else:
             # No strong indicators, use enhanced LLM prompt
             prompt = f"""
-You are an AI text analyst specialized in sentiment detection. You are given a text segment.
-Your task is to analyze the sentiment expressed regarding a specific context.
+You are an AI text analyst specialized in sentiment detection about a specific context.
+
+Task:
+Given a text segment, classify the sentiment expressed *about the context only*.
 
 Context: {context}
 
 Text segment:
 {segment_text}
 
-Instructions:
-- Pay CLOSE attention to strong emotional words like 'hate', 'love', 'awful', 'terrible', 'great'
-- Look for explicit statements of satisfaction or dissatisfaction
-- Focus specifically on sentiment about {context}
-- Classify as one of: positive, negative, neutral
-- If ANY negative sentiment is expressed about the context, classify as 'negative'
-- If ANY positive sentiment is expressed about the context, classify as 'positive'
-- Only classify as 'neutral' if there is truly NO sentiment expressed
+Decision rules (apply in order):
+1) Consider only statements about the context (ignore unrelated content).
+2) Handle negation and sarcasm (e.g., "not great", "yeah, great...").
+3) If ANY explicit negative sentiment about the context appears → negative.
+4) Else if ANY explicit positive sentiment about the context appears → positive.
+5) Else if the text attributes sentiment to someone else (e.g., "People say it's awful"), count it as sentiment unless it is being disputed.
+6) Else → neutral.
 
-Respond in this exact JSON format:
+Edge cases:
+- Mixed polarity: if both positive and negative about the context are present, classify by this precedence: negative > positive.
+- Uncertainty/hedging (e.g., "might be good", "could be bad") counts only if sentiment is actually expressed (e.g., "might be bad" = negative).
+- Questions about sentiment are not sentiment themselves (e.g., "Is {context} good?" = neutral).
+
+Respond in this exact JSON format with no additional text:
 {{"sentiment": "<positive|negative|neutral>"}}
 """
 
