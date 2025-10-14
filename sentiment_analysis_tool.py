@@ -399,7 +399,15 @@ Respond in this exact JSON format with no additional text:
             # Parse JSON response safely
             try:
                 llm_response_text = response['choices'][0]['text'].strip()
-                logger.info(f"Raw LLM response: {llm_response_text}")
+
+                # Enhanced logging - clearly show segment analysis
+                logger.info("="*80)
+                logger.info(f"SEGMENT {segment.get('id')} LLM ANALYSIS")
+                logger.info(f"Context: {context}")
+                logger.info(f"Segment Text: {segment_text}")
+                logger.info(f"Raw LLM Response: {llm_response_text}")
+                logger.info(f"Response Length: {len(llm_response_text)} characters")
+                logger.info("="*80)
 
                 # Try to extract JSON from the response (LLM might include extra text)
                 # Look for JSON pattern in the response
@@ -407,6 +415,7 @@ Respond in this exact JSON format with no additional text:
 
                 if json_match:
                     # Parse the matched JSON
+                    logger.info(f"✓ Found JSON pattern: {json_match.group(0)}")
                     res_json = json.loads(json_match.group(0))
                     sentiment = res_json.get("sentiment", "neutral").lower()
 
@@ -417,9 +426,10 @@ Respond in this exact JSON format with no additional text:
 
                     detection_method = "llm-based"
                     detection_details = f"Model: Llama 2 7B"
-                    logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
+                    logger.info(f"✓ Successfully parsed sentiment: {sentiment}")
                 else:
                     # Try parsing the entire response as JSON
+                    logger.info("No JSON pattern found, attempting to parse entire response as JSON")
                     res_json = json.loads(llm_response_text)
                     sentiment = res_json.get("sentiment", "neutral").lower()
 
@@ -430,17 +440,25 @@ Respond in this exact JSON format with no additional text:
 
                     detection_method = "llm-based"
                     detection_details = f"Model: Llama 2 7B"
-                    logger.info(f"Using LLM-based sentiment for segment {segment.get('id')}: {sentiment}")
+                    logger.info(f"✓ Successfully parsed sentiment: {sentiment}")
 
             except json.JSONDecodeError as e:
-                logger.error(f"LLM failed to parse - JSON decode error: {e}")
-                logger.error(f"LLM response was: {llm_response_text}")
+                logger.error("="*80)
+                logger.error(f"✗ PARSING FAILED - Segment {segment.get('id')}")
+                logger.error(f"JSON Decode Error: {e}")
+                logger.error(f"Failed Response: {llm_response_text}")
+                logger.error(f"Response Type: {type(llm_response_text)}")
+                logger.error(f"First 200 chars: {llm_response_text[:200]}")
+                logger.error("="*80)
                 sentiment = "neutral"
                 detection_method = "llm-based"
                 detection_details = f"Failed to parse LLM response (JSON error), defaulted to neutral"
             except Exception as e:
-                logger.error(f"LLM failed to parse - unexpected error: {e}")
-                logger.error(f"LLM response was: {response['choices'][0]['text'].strip() if 'choices' in response and len(response['choices']) > 0 else 'No response'}")
+                logger.error("="*80)
+                logger.error(f"✗ PARSING FAILED - Segment {segment.get('id')}")
+                logger.error(f"Unexpected Error: {type(e).__name__}: {e}")
+                logger.error(f"Failed Response: {response['choices'][0]['text'].strip() if 'choices' in response and len(response['choices']) > 0 else 'No response'}")
+                logger.error("="*80)
                 sentiment = "neutral"
                 detection_method = "llm-based"
                 detection_details = f"Failed to parse LLM response (error: {str(e)}), defaulted to neutral"
