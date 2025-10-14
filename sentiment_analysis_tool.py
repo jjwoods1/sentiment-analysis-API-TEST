@@ -391,33 +391,43 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
             except Exception as e:
                 logger.warning(f"Failed to save segment to fallback log: {e}")
             # No strong indicators, use enhanced LLM prompt
-            prompt = f"""
-You are an AI text analyst specialized in sentiment detection about a specific context.
+            prompt = f"""SYSTEM INSTRUCTION: You are a JSON-only output system. You must ONLY output valid JSON. No explanations. No preamble. No additional text. ONLY JSON.
 
-Task:
-Given a text segment, classify the sentiment expressed *about the context only*.
+INPUT DATA:
+Context word: {context}
+Text to analyze: {segment_text}
 
-Context: {context}
+ANALYSIS TASK:
+Classify the sentiment expressed about "{context}" in the text above.
 
-Text segment:
-{segment_text}
+CLASSIFICATION RULES (apply in strict order):
+1. Only analyze sentiment about "{context}" - ignore everything else
+2. Handle negation correctly (e.g., "not good" = negative)
+3. If ANY negative sentiment about "{context}" exists → return negative
+4. Else if ANY positive sentiment about "{context}" exists → return positive
+5. Else → return neutral
 
-Decision rules (apply in order):
-1) Consider only statements about the context (ignore unrelated content).
-2) Handle negation and sarcasm (e.g., "not great", "yeah, great...").
-3) If ANY explicit negative sentiment about the context appears → negative.
-4) Else if ANY explicit positive sentiment about the context appears → positive.
-5) Else if the text attributes sentiment to someone else (e.g., "People say it's awful"), count it as sentiment unless it is being disputed.
-6) Else → neutral.
+CRITICAL CONSTRAINTS:
+- Mixed sentiment: negative takes precedence over positive
+- Questions are not sentiment (e.g., "Is {context} good?" = neutral)
+- Hedging with sentiment counts (e.g., "might be bad" = negative)
+- Only statements about "{context}" matter
 
-Edge cases:
-- Mixed polarity: if both positive and negative about the context are present, classify by this precedence: negative > positive.
-- Uncertainty/hedging (e.g., "might be good", "could be bad") counts only if sentiment is actually expressed (e.g., "might be bad" = negative).
-- Questions about sentiment are not sentiment themselves (e.g., "Is {context} good?" = neutral).
+OUTPUT REQUIREMENTS:
+- MUST be valid JSON only
+- MUST use this EXACT format: {{"sentiment": "VALUE"}}
+- VALUE must be EXACTLY one of: positive, negative, neutral
+- NO other text before or after the JSON
+- NO explanations, reasoning, or commentary
+- NO markdown formatting, no code blocks
+- Just the raw JSON object
 
-Respond in this exact JSON format with no additional text:
-{{"sentiment": "<positive|negative|neutral>"}}
-"""
+EXAMPLE OUTPUTS (use this exact format):
+{{"sentiment": "positive"}}
+{{"sentiment": "negative"}}
+{{"sentiment": "neutral"}}
+
+YOUR RESPONSE (JSON ONLY):"""
 
             try:
                 _stdout, _stderr = sys.stdout, sys.stderr
