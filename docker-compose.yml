@@ -14,6 +14,8 @@ services:
       # Mount pattern files for live updates without restart
       - ./positive_patterns.txt:/app/positive_patterns.txt
       - ./negative_patterns.txt:/app/negative_patterns.txt
+      # Mount LLM fallback log for persistence
+      - ./llm_fallback_segments.txt:/app/llm_fallback_segments.txt
     environment:
       - PYTHONUNBUFFERED=1
       - HOST=0.0.0.0
@@ -37,6 +39,8 @@ services:
       # Mount pattern files for live updates without restart
       - ./positive_patterns.txt:/app/positive_patterns.txt
       - ./negative_patterns.txt:/app/negative_patterns.txt
+      # Mount LLM fallback log for persistence
+      - ./llm_fallback_segments.txt:/app/llm_fallback_segments.txt
     environment:
       - PYTHONUNBUFFERED=1
     entrypoint: ["python", "sentiment_analysis_tool.py"]

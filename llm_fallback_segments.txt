@@ -1,0 +1,5 @@
+# LLM Fallback Segments Log
+# This file logs text segments that fell back to LLM analysis because no rule-based patterns matched
+# Use this log to identify new patterns that should be added to positive_patterns.txt or negative_patterns.txt
+# Format: Timestamp, Context, Segment ID, Segment Text
+
