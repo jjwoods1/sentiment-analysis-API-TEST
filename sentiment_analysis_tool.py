@@ -38,6 +38,7 @@ MAX_LLM_CONTEXT = 512
 MAX_RESPONSE_TOKENS = 300
 NEGATIVE_PATTERNS_FILE = BASE_DIR / "negative_patterns.txt"
 POSITIVE_PATTERNS_FILE = BASE_DIR / "positive_patterns.txt"
+LLM_FALLBACK_LOG = BASE_DIR / "llm_fallback_segments.txt"
 
 # ---------------------------
 # Imports - ML/AI dependencies
@@ -358,8 +359,37 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
             sentiment = rule_sentiment
             detection_method = "rule-based"
             detection_details = f"Matched pattern: '{matched_pattern}'"
-            logger.info(f"Using rule-based sentiment for segment {segment.get('id')}: {sentiment}")
+
+            # Enhanced logging for rule-based detection
+            logger.info("="*80)
+            logger.info(f"SEGMENT {segment.get('id')} RULE-BASED DETECTION")
+            logger.info(f"Context: {context}")
+            logger.info(f"Segment Text: {segment_text}")
+            logger.info(f"✓ Matched Pattern: '{matched_pattern}'")
+            logger.info(f"✓ Detected Sentiment: {sentiment}")
+            logger.info("="*80)
         else:
+            # No pattern match - log this segment for future pattern updates
+            logger.info("="*80)
+            logger.info(f"SEGMENT {segment.get('id')} - NO PATTERN MATCH (Falling back to LLM)")
+            logger.info(f"Context: {context}")
+            logger.info(f"Segment Text: {segment_text}")
+            logger.info("="*80)
+
+            # Save segment to LLM fallback log file
+            try:
+                from datetime import datetime
+                with open(LLM_FALLBACK_LOG, 'a', encoding='utf-8') as fallback_file:
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    fallback_file.write(f"\n{'='*80}\n")
+                    fallback_file.write(f"Timestamp: {timestamp}\n")
+                    fallback_file.write(f"Context: {context}\n")
+                    fallback_file.write(f"Segment ID: {segment.get('id')}\n")
+                    fallback_file.write(f"Segment Text: {segment_text}\n")
+                    fallback_file.write(f"{'='*80}\n")
+                logger.info(f"Saved segment to LLM fallback log: {LLM_FALLBACK_LOG}")
+            except Exception as e:
+                logger.warning(f"Failed to save segment to fallback log: {e}")
             # No strong indicators, use enhanced LLM prompt
             prompt = f"""
 You are an AI text analyst specialized in sentiment detection about a specific context.
