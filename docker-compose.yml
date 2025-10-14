@@ -5,7 +5,7 @@ services:
     image: sentiment-analysis-tool:latest
     container_name: sentiment-analysis-api
     ports:
-      - "8000:8000"
+      - "8008:8008"
     volumes:
       # Mount models directory for persistence (models are ~7GB+)
       - ./models:/app/.models
@@ -17,10 +17,10 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - HOST=0.0.0.0
-      - PORT=8000
+      - PORT=8008
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
       interval: 30s
       timeout: 10s
       retries: 3
