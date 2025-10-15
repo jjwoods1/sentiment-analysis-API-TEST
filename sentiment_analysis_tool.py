@@ -390,53 +390,36 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
                 logger.info(f"Saved segment to LLM fallback log: {LLM_FALLBACK_LOG}")
             except Exception as e:
                 logger.warning(f"Failed to save segment to fallback log: {e}")
-            # No strong indicators, use enhanced LLM prompt
-            prompt = f"""SYSTEM INSTRUCTION: You are a JSON-only output system. You must ONLY output valid JSON. No explanations. No preamble. No additional text. ONLY JSON.
+            # No strong indicators, use simplified LLM prompt with better parameters
+            prompt = f"""Analyze sentiment about "{context}" in this text: "{segment_text}"
 
-INPUT DATA:
-Context word: {context}
-Text to analyze: {segment_text}
+Rules:
+- Only sentiment about "{context}" matters
+- Handle negation (e.g., "not good" = negative)
+- Questions = neutral
+- Mixed sentiment = use the stronger one
 
-ANALYSIS TASK:
-Classify the sentiment expressed about "{context}" in the text above.
+Respond ONLY with valid JSON in this exact format:
+{{"sentiment": "positive"}} OR {{"sentiment": "negative"}} OR {{"sentiment": "neutral"}}
 
-CLASSIFICATION RULES (apply in strict order):
-1. Only analyze sentiment about "{context}" - ignore everything else
-2. Handle negation correctly (e.g., "not good" = negative)
-3. If ANY negative sentiment about "{context}" exists → return negative
-4. Else if ANY positive sentiment about "{context}" exists → return positive
-5. Else → return neutral
-
-CRITICAL CONSTRAINTS:
-- Mixed sentiment: negative takes precedence over positive
-- Questions are not sentiment (e.g., "Is {context} good?" = neutral)
-- Hedging with sentiment counts (e.g., "might be bad" = negative)
-- Only statements about "{context}" matter
-
-OUTPUT REQUIREMENTS:
-- MUST be valid JSON only
-- MUST use this EXACT format: {{"sentiment": "VALUE"}}
-- VALUE must be EXACTLY one of: positive, negative, neutral
-- NO other text before or after the JSON
-- NO explanations, reasoning, or commentary
-- NO markdown formatting, no code blocks
-- Just the raw JSON object
-
-EXAMPLE OUTPUTS (use this exact format):
-{{"sentiment": "positive"}}
-{{"sentiment": "negative"}}
-{{"sentiment": "neutral"}}
-
-YOUR RESPONSE (JSON ONLY):"""
+JSON response:"""
 
             try:
                 _stdout, _stderr = sys.stdout, sys.stderr
                 sys.stdout = sys.stderr = DevNull()
-                response = llm(prompt, max_tokens=MAX_RESPONSE_TOKENS)
+                # Use more controlled generation parameters for better JSON output
+                response = llm(
+                    prompt,
+                    max_tokens=120,  # Allow enough space for response
+                    temperature=0.1,  # Low temperature for more deterministic output
+                    top_p=0.9,
+                    stop=["\n\n", "Explanation:", "Note:"],  # Stop at common explanation markers
+                    repeat_penalty=1.1
+                )
             finally:
                 sys.stdout, sys.stderr = _stdout, _stderr
 
-            # Parse JSON response safely
+            # Parse JSON response with improved extraction
             try:
                 llm_response_text = response['choices'][0]['text'].strip()
 
@@ -449,50 +432,55 @@ YOUR RESPONSE (JSON ONLY):"""
                 logger.info(f"Response Length: {len(llm_response_text)} characters")
                 logger.info("="*80)
 
-                # Try to extract JSON from the response (LLM might include extra text)
-                # Look for JSON pattern in the response
-                json_match = re.search(r'\{[^}]*"sentiment"\s*:\s*"(positive|negative|neutral)"[^}]*\}', llm_response_text, re.IGNORECASE)
+                # Multiple extraction strategies for robustness
+                sentiment = None
 
-                if json_match:
-                    # Parse the matched JSON
-                    logger.info(f"✓ Found JSON pattern: {json_match.group(0)}")
-                    res_json = json.loads(json_match.group(0))
-                    sentiment = res_json.get("sentiment", "neutral").lower()
+                # Strategy 1: Try to find ANY JSON object with sentiment key
+                json_matches = re.finditer(r'\{[^}]*\}', llm_response_text)
+                for match in json_matches:
+                    try:
+                        potential_json = match.group(0)
+                        parsed = json.loads(potential_json)
+                        if "sentiment" in parsed:
+                            sentiment = parsed["sentiment"].lower()
+                            logger.info(f"✓ Extracted JSON: {potential_json}")
+                            break
+                    except json.JSONDecodeError:
+                        continue
 
-                    # Validate sentiment value
-                    if sentiment not in ["positive", "negative", "neutral"]:
-                        logger.warning(f"Invalid sentiment value '{sentiment}' from LLM, defaulting to neutral")
-                        sentiment = "neutral"
+                # Strategy 2: Look for sentiment value directly in quotes
+                if not sentiment:
+                    value_match = re.search(r'"sentiment"\s*:\s*"(positive|negative|neutral)"', llm_response_text, re.IGNORECASE)
+                    if value_match:
+                        sentiment = value_match.group(1).lower()
+                        logger.info(f"✓ Extracted sentiment from pattern: {sentiment}")
 
+                # Strategy 3: Look for just the sentiment words
+                if not sentiment:
+                    word_match = re.search(r'\b(positive|negative|neutral)\b', llm_response_text, re.IGNORECASE)
+                    if word_match:
+                        sentiment = word_match.group(1).lower()
+                        logger.info(f"✓ Extracted sentiment word: {sentiment}")
+
+                # Validate and set sentiment
+                if sentiment and sentiment in ["positive", "negative", "neutral"]:
                     detection_method = "llm-based"
                     detection_details = f"Model: Llama 2 7B"
                     logger.info(f"✓ Successfully parsed sentiment: {sentiment}")
                 else:
-                    # Try parsing the entire response as JSON
-                    logger.info("No JSON pattern found, attempting to parse entire response as JSON")
-                    res_json = json.loads(llm_response_text)
-                    sentiment = res_json.get("sentiment", "neutral").lower()
+                    raise ValueError(f"Invalid or missing sentiment value: {sentiment}")
 
-                    # Validate sentiment value
-                    if sentiment not in ["positive", "negative", "neutral"]:
-                        logger.warning(f"Invalid sentiment value '{sentiment}' from LLM, defaulting to neutral")
-                        sentiment = "neutral"
-
-                    detection_method = "llm-based"
-                    detection_details = f"Model: Llama 2 7B"
-                    logger.info(f"✓ Successfully parsed sentiment: {sentiment}")
-
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
                 logger.error("="*80)
                 logger.error(f"✗ PARSING FAILED - Segment {segment.get('id')}")
-                logger.error(f"JSON Decode Error: {e}")
+                logger.error(f"Error: {type(e).__name__}: {e}")
                 logger.error(f"Failed Response: {llm_response_text}")
                 logger.error(f"Response Type: {type(llm_response_text)}")
-                logger.error(f"First 200 chars: {llm_response_text[:200]}")
+                logger.error(f"First 200 chars: {llm_response_text[:200] if len(llm_response_text) > 200 else llm_response_text}")
                 logger.error("="*80)
                 sentiment = "neutral"
                 detection_method = "llm-based"
-                detection_details = f"Failed to parse LLM response (JSON error), defaulted to neutral"
+                detection_details = f"Failed to parse LLM response, defaulted to neutral"
             except Exception as e:
                 logger.error("="*80)
                 logger.error(f"✗ PARSING FAILED - Segment {segment.get('id')}")
