@@ -122,8 +122,12 @@ def detect_sentiment_keywords(text: str, context: str) -> tuple[Optional[str], O
     text_lower = text.lower()
     context_lower = context.lower()
 
-    # Check for whole-word match using regex word boundary
-    context_pattern = re.compile(r'\b' + re.escape(context_lower) + r'\b', re.IGNORECASE)
+    # Create flexible pattern that works with alphanumeric brand names (e.g., "O2", "3G", "4G")
+    escaped_context = re.escape(context_lower)
+    context_pattern = re.compile(
+        r'(?:^|(?<=\s))' + escaped_context + r'(?=\s|[.,!?;:]|$)',
+        re.IGNORECASE
+    )
     if context_pattern.search(text):
         # Load patterns from files
         negative_patterns = load_patterns_from_file(NEGATIVE_PATTERNS_FILE)
@@ -300,10 +304,16 @@ def analyze_contextual_sentiment(file_path: str, context: str) -> Dict[str, Any]
         logger.error("No segments found in the transcript")
         sys.exit(1)
     
-    # Find segments containing the context word (whole word match only)
+    # Find segments containing the context word
     context_segments = []
-    # Use regex word boundary to match whole words only
-    context_pattern = re.compile(r'\b' + re.escape(context.lower()) + r'\b', re.IGNORECASE)
+    # Create flexible pattern that works with alphanumeric brand names (e.g., "O2", "3G", "4G")
+    # Use word boundaries but handle cases where boundaries don't work (alphanumeric)
+    escaped_context = re.escape(context.lower())
+    # Try word boundary match, but also allow standalone match for alphanumeric terms
+    context_pattern = re.compile(
+        r'(?:^|(?<=\s))' + escaped_context + r'(?=\s|[.,!?;:]|$)',
+        re.IGNORECASE
+    )
 
     for segment in segments:
         segment_text = segment.get("text", "")
